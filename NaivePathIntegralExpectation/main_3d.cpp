@@ -8,6 +8,7 @@
 #include <ppl.h>
 #include <algorithm>
 #include<array>
+#include <mutex>
 
 #include <glm\glm.hpp>
 #include <glm\gtx\norm.hpp>
@@ -25,16 +26,16 @@ mt19937 mt_rand(std::chrono::system_clock::now().time_since_epoch().count());
 //const int grid_width = 10;
 //const double grid_spacing = 8.0 / grid_width;
 //const int num_samples = 3e5;
-const double box_bounds = 1;
-const int burn_in_samples = 1e5;
-const int correlation_skip = 2; //because metropolis-hastings samples are correlated, skip some samples
+const double box_bounds = 4.0;
+const int burn_in_samples = 1e4;
+const int correlation_skip = 3; //because metropolis-hastings samples are correlated, skip some samples
 const int tgrid_width = 300; //AKA Trotter number
 const double time_range = 50;
 double hbar = 1;
 const double omega = 1;
 const double lambda = 0;
 
-const int NUM_SAMPLE_POINTS = 300; // multiplies number of samples
+const int NUM_SAMPLE_POINTS = 3000; // multiplies number of samples
 
 const bool BIASED_UPDATES = false;
 const bool ADAPTIVE_STEPS = false;
@@ -46,9 +47,11 @@ const double MINV_MULT = 3 * pow(time_range, -2./3); //the prefactor according t
 
 const double epsilon = 0.001;
 
-const int NUM_SAMPLES_MIN = 1e6;
-const int NUM_SAMPLES_MAX = 1e6;
+const int NUM_SAMPLES_MIN = 1e5;
+const int NUM_SAMPLES_MAX = 1e5;
 const int NUM_SAMPLES_INC = 2e5;
+
+const double BOX_COST = 1e5;
 
 
 double gen_norm(double mean = 0, double stddev = 1) {
@@ -68,6 +71,8 @@ int gen_uniform(int min, int max) {
 const string outputFilename = "C:\\Users\\Christian\\Desktop\\path_integrals.csv";
 
 std::vector<double> sinTable(tgrid_width);
+
+std::mutex mut;
 
 double computeSin(int x, int freq)
 {
@@ -97,16 +102,15 @@ void initializeNuclei()
 {
 	const double bondLength = 2.0;
 	//hydrogen molecule
-	nuclei.push_back(Nucleus(glm::dvec3(0, 0, 0)));
-	//nuclei.push_back(Nucleus(glm::dvec3(-2 / 2, 0, 0)));
-	//nuclei.push_back(Nucleus(glm::dvec3(2 / 2, 0, 0)));
+	nuclei.push_back(Nucleus(glm::dvec3(-1, 0, 0)));
+	nuclei.push_back(Nucleus(glm::dvec3(1, 0, 0)));
 }
 
 double effectiveCoulomb(double x, double minV, double e) { //where e = exp(-minV*x) for simplification
 	return -(1 - e) / x;
 }
 double effectiveCoulombD1(double x, double minV, double e) { //first derivative
-	return (1 - e * (1 + minV * x)) / (x*x);
+	return e * (2.0 - 2.0 / e + 2 * minV * x + minV * minV * x * x) / (2 * x * x);
 }
 double effectiveCoulombD2(double x, double minV, double e) { //second derivative
 	return e * (2.0 - 2.0 / e + minV * x * (2 + minV * x)) / (x*x*x);
@@ -153,7 +157,10 @@ void main()
 
 				int samplesCount = 0;
 				concurrency::parallel_for((size_t)0, (size_t)NUM_SAMPLE_POINTS, [&](int i) {
-					double deltaWeight = 0.1;
+					/*double runningAvg = 0;
+					int acount = 1;*/
+
+					double deltaWeight = 0.05;
 					/*for (int i = 0; i < grid_width;i++)
 					{*/
 					vector<SystemState> path(tgrid_width);
@@ -213,6 +220,9 @@ void main()
 									double e = exp(-minV * x);
 									SE += -n.charge * (1 - e) / x * dt;
 								}
+								if (newpath[t].positions[np].x > box_bounds || newpath[t].positions[np].x < -box_bounds ||
+									newpath[t].positions[np].y > box_bounds || newpath[t].positions[np].y < -box_bounds ||
+									newpath[t].positions[np].z > box_bounds || newpath[t].positions[np].z < -box_bounds) SE += BOX_COST*dt; //energy penalty for exiting the box. This should be made as large as possible so as to enforce hard wall condition.
 							}
 						}
 
@@ -231,7 +241,7 @@ void main()
 								double avgE = 0;
 								for (int np = 0; np < NUM_PARTICLES; np++)
 								{
-									for (int t = 0; t < tgrid_width - 1; t++) //naive energy estimator
+									for (int t = 1; t < tgrid_width - 1; t++) //naive energy estimator
 									{
 										double V0 = 0, V1 = 0, V2 = 0, V3 = 0;//derivatives of the potential, with relevant weights
 										double dx2 = glm::length2((newpath[t + 1].positions[np] - newpath[t].positions[np]));
@@ -250,18 +260,22 @@ void main()
 
 											//energy estimators from Grujic 2006 
 
+											glm::dvec3 norm = -glm::normalize(n.pos - newpath[t].positions[np]);
+
 											double
 												i0 = effectiveCoulomb(x, minV, e),
-												i1 = x * effectiveCoulombD1(x, minV, e) / 2,
+												i1 = glm::dot(newpath[t].positions[np], norm) * effectiveCoulombD1(x, minV, e) / 2,
 												i2 = (dt / 6 + dx2 / 12) * effectiveCoulombD2(x, minV, e),
 												i3 = (x * dt / 24 + x * dx2 / 48) * effectiveCoulombD3(x, minV, e);
 
 											V0 += i0;
 											V1 += i1;
+											/*V2 += i2;
+											V3 += i3;*/
 
 											/*if (!std::isnan(i0)) V0 += i0;
-											if (!std::isnan(i1)) V1 += i1;*/
-											/*if (!std::isnan(i2)) V2 += i2;
+											if (!std::isnan(i1)) V1 += i1;*//*
+											if (!std::isnan(i2)) V2 += i2;
 											if (!std::isnan(i3)) V3 += i3;*/
 
 											//double inc = e * (
@@ -272,17 +286,17 @@ void main()
 											//	+ dx2 * (2.0 - 2.0 / e + 2.0 * minV * x + minV * minV * x * x - minV * minV * minV * x * x * x)) / (48.0 * x * x * x);//second order energy estimator according to Grujic 2006
 											//if (!std::isnan(inc)) avgE += inc;
 										}
-										for (int ni = 0; ni < NUM_PARTICLES; ni++)
-										{
-											if (ni == np) continue; //no self-interaction
-											double x = glm::length(newpath[t].positions[np] - newpath[t].positions[ni]);
-											double e = exp(-minV * x);
-											//energy estimators from Grujic 2006 
-											V0 += effectiveCoulomb(x, minV, e);
-											V1 += x * effectiveCoulombD1(x, minV, e) / 2;
-											V2 += (dt / 6 + dx2 / 12) * effectiveCoulombD2(x, minV, e);
-											V3 += (x * dt / 24 + x * dx2 / 48) * effectiveCoulombD3(x, minV, e);
-										}
+										//for (int ni = 0; ni < NUM_PARTICLES; ni++)
+										//{
+										//	if (ni == np) continue; //no self-interaction
+										//	double x = glm::length(newpath[t].positions[np] - newpath[t].positions[ni]);
+										//	double e = exp(-minV * x);
+										//	//energy estimators from Grujic 2006 
+										//	V0 += effectiveCoulomb(x, minV, e);
+										//	V1 += x * effectiveCoulombD1(x, minV, e) / 2;
+										//	V2 += (dt / 6 + dx2 / 12) * effectiveCoulombD2(x, minV, e);
+										//	V3 += (x * dt / 24 + x * dx2 / 48) * effectiveCoulombD3(x, minV, e);
+										//}
 										avgE += V0;
 										avgE += V1;
 										avgE += V2;
@@ -292,7 +306,6 @@ void main()
 
 								}
 								avgE /= tgrid_width;
-
 								sumO += avgE;
 								sum++;
 								sumSq += avgE*avgE;
@@ -300,18 +313,27 @@ void main()
 							}
 						}
 						acnt++;
-						if (j == num_samples - 1) cout << "a = " << (aTotal / acnt) << "\t" << sumO / (sum) << "\t\t sample " << j << endl;
 						if (!std::isnan(a)) aTotal += a;
 						aPrev = a;
 						//exp(-SE / hbar + 0.5 * lenSquared)
 					}
-					//#ifdef _WIN32
-					//					system("cls");
-					//#else
-					//					system("clear");
-					//#endif
-					//cout << "\t\t" << sumO / sum << endl;
-					//cout << "Done: " << (int)(100 * ((double)k / NUM_EVALS + (double)i / grid_width / NUM_EVALS)) << "%\n";
+
+					sum++;
+					cout << "a = " << (aTotal / acnt) << "\t" << sumO/sum << "\t\t sample " << endl;
+
+
+					if (i%8==0) //only do on one thread
+					{
+						ofstream st(outputFilename, ios::out | ios::app);
+						st << tgrid_width
+							<< "," << sumO/sum
+							<< "," << time_range
+							<< "," << num_samples
+							<< "," << aTotal / acnt
+							<< "," << chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - t).count()
+							<< endl;
+					}
+
 				});
 				samples[k] = sumO / sum;
 
@@ -322,7 +344,7 @@ void main()
 				{
 					ofstream st(outputFilename, ios::out | ios::app);
 					st << tgrid_width
-						<< "," << sumO / sum
+						<< "," << sumO/sum
 						<< "," << time_range
 						<< "," << num_samples
 						<< "," << aTotal / acnt

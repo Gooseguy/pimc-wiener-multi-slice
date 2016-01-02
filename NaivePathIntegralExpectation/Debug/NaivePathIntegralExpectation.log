@@ -1,8 +1,10 @@
 ﻿  main_3d.cpp
-c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(20): warning C4244: 'argument' : conversion from 'std::chrono::system_clock::rep' to 'unsigned int', possible loss of data
-c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(29): warning C4244: 'initializing' : conversion from 'double' to 'const int', possible loss of data
-c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(49): warning C4244: 'initializing' : conversion from 'double' to 'const int', possible loss of data
+c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(21): warning C4244: 'argument' : conversion from 'std::chrono::system_clock::rep' to 'unsigned int', possible loss of data
 c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(50): warning C4244: 'initializing' : conversion from 'double' to 'const int', possible loss of data
 c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(51): warning C4244: 'initializing' : conversion from 'double' to 'const int', possible loss of data
-c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(79): warning C4018: '<' : signed/unsigned mismatch
+c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(52): warning C4244: 'initializing' : conversion from 'double' to 'const int', possible loss of data
+c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(84): warning C4018: '<' : signed/unsigned mismatch
+c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(333): warning C4258: 't' : definition from the for loop is ignored; the definition from the enclosing scope is used
+          c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(178) : definition of 't' ignored
+          c:\users\christian\documents\visual studio 2013\projects\naivepathintegralexpectation\naivepathintegralexpectation\main_3d.cpp(135) : definition of 't' used
   NaivePathIntegralExpectation.vcxproj -> C:\Users\Christian\Documents\Visual Studio 2013\Projects\NaivePathIntegralExpectation\Debug\NaivePathIntegralExpectation.exe
